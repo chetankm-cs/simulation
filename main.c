@@ -4,6 +4,7 @@
  * *********************************************************/
 
 float time_step;
+COLLISION_DATA *collisons=NULL;
 int insert(ADJACENCY_LIST **list, int vertex_id,int next_vertex,int weight)
 {
     ADJACENCY_LIST *temp;
@@ -109,16 +110,12 @@ void print_cars(CARS *c)
     {
         printf("\n%s start_node %d end_node %d endurance %d  velocity %d ",c->car_data[i].name,c->car_data[i].start_node,c->car_data[i].end_node,c->car_data[i].endurance,c->car_data[i].velocity);
     }
-}void update_car_path_initial(CAR *c)
-{
-    c->last_node_visited =c->start_node;
-   
-}void update_car_path_initial(CAR *c)
-{
-    c->last_node_visited =c->start_node;
-   
 }
-int check_edge_id(ADJACENCY_LIST *p,int value,int vertex_id, int weight) // this function is to  allocate edge id if edge is bydirectional then same edge id goes to both places in adjacency list .if there are multipal bidirectional or unidirectional edges between two nodes then each edge gets different id and same values goes on both the places in adjacency list. 
+// this function is to  allocate edge id if edge is bydirectional then same edge 
+// id goes to both places in adjacency list .if there are multipal bidirectional 
+// or unidirectional edges between two nodes then each edge gets different id and 
+// same values goes on both the places in adjacency list. 
+int check_edge_id(ADJACENCY_LIST *p,int value,int vertex_id, int weight) 
 {
     while(p!=NULL)
     {
@@ -155,6 +152,16 @@ int allocate_edge_id(GRAPH *g)
     }
     g->no_of_edges = count;
 }
+
+void initialise_car_path(CAR *c)
+{
+        c->last_node_visited =c->start_node; 
+        c->path_history = (PATH_INFO *)malloc(sizeof(PATH_INFO));
+        c->path_history->enter_time = 0;
+        c->path_history->next = NULL;
+        c->path_history->path_node = c->start_node;
+        c->current_edge = -1;
+}
 void init(GRAPH *g,CARS *c,EDGES *E)
 {
     int i;
@@ -176,6 +183,8 @@ void init(GRAPH *g,CARS *c,EDGES *E)
            e[temp->edge_id].no_of_cars = 0;
            e[temp->edge_id].status = 0;
            e[temp->edge_id].max_age = 0;
+           e[temp->edge_id].car_list= NULL;
+           e[temp->edge_id].last_car_exit_time =0 ;
 
            temp2 = g->graph_data[temp->next_node];
            while(temp2 != NULL)
@@ -188,6 +197,11 @@ void init(GRAPH *g,CARS *c,EDGES *E)
         }
     }
     E->edge_data=e;
+
+    // intialising car _path
+     for(i=0;i<c->no_of_cars;i++){
+        initialise_car_path((c->car_data) + i);
+    }
 }
 void print_edges(EDGES *e)
 {
@@ -200,10 +214,141 @@ void print_edges(EDGES *e)
         printf(" status:%d type:%d \n",e->edge_data[i].status , e->edge_data[i].type);
     }   
 }
-
-void update_car_path(CAR *c)
+void remove_car_from_list(EDGE *e,int car_id)
 {
+    CARS_ON_EDGE *temp,*temp2;
+    if(e->car_list->car_id == car_id)
+    {
+        e->car_list=e->car_list->next;
+        return;
+    }
+    temp = e->car_list;
+    temp2= temp->next;
+    while(temp2!= NULL)
+    {
+        if(temp2->car_id == car_id)
+        {
+            temp->next=temp2->next;
+            break;
+        }
+        temp=temp2;
+        temp2=temp2->next;
+    }
+}
+void update_car_path(CAR *c,EDGES *e,long global_tick)
+{
+    AGE_INFO *temp;
+    CARS_ON_EDGE *temp2;
+    PATH_INFO *temp3;
+    if(c->current_destination != -1)
+    {
+        // car decided to leave the node in last tick; 
+        if(c->path_history->exit_time+1 == global_tick)
+        {
+            e->edge_data[c->current_edge].status=1;
+            e->edge_data[c->current_edge].no_of_cars+=1;
+            if(global_tick - e->edge_data[c->current_edge].last_car_exit_time != 1)
+            {
+                temp = (AGE_INFO *)malloc(sizeof(AGE_INFO));
+                temp->idle_start_time = e->edge_data[c->current_edge].last_car_exit_time;
+                temp->idle_finish_time=global_tick-1;
+                temp->next = e->edge_data[c->current_edge].age_history;
+                e->edge_data[c->current_edge].age_history = temp;
 
+                temp2 =(CARS_ON_EDGE *)malloc(sizeof(CARS_ON_EDGE));
+                temp2->car_id = c->id;
+                temp2->next = e->edge_data[c->current_edge].car_list;
+                e->edge_data[c->current_edge].car_list=temp2;
+            }
+        }
+
+        // car reaches a node
+        if((global_tick - c->path_history->exit_time )* time_step* c->velocity >= e->edge_data[c->current_edge].distance)
+        {
+            //update EDGE :  update last_car_exit_time & endurance & status & no_of_cars
+            e->edge_data[c->current_edge].last_car_exit_time = global_tick;
+            e->edge_data[c->current_edge].no_of_cars-=1;
+            if(e->edge_data[c->current_edge].no_of_cars == 0)e->edge_data[c->current_edge].status=0;
+            c->endurance -= e->edge_data[c->current_edge].distance;
+            if(c->endurance == 0)c->done =1; // car out of gas 
+            // remove car from car_list
+
+            remove_car_from_list((e->edge_data)+(c->current_edge),c->id); 
+
+            //update car path 
+            temp3=(PATH_INFO *)malloc(sizeof(PATH_INFO));
+            temp3->enter_time=global_tick;
+            temp3->exit_time = -1;
+            temp3->next = c->path_history;
+            c->path_history = temp3;
+
+            c->current_edge = -1;    
+        }
+    }
+}
+void detect_collison(EDGE *e,CARS *c,int car1,int car2,long global_tick)
+{
+    int direction=1;
+    int flag =0;
+    COLLISION_DATA *temp;
+    float dist1,dist2,dist3,dist4;
+    if(c->car_data[car1].current_destination == e->u && c->car_data[car2].current_destination ==e->u) direction = 0;
+    if(c->car_data[car1].current_destination == e->v && c->car_data[car2].current_destination ==e->v) direction = 0;
+        //if velocity variable then load 
+    
+        dist1 = (global_tick - c->car_data[car1].path_history->exit_time )* time_step* c->car_data[car1].velocity ;
+        dist2 = (global_tick - c->car_data[car2].path_history->exit_time )* time_step* c->car_data[car2].velocity ;
+       
+        dist3 = ((global_tick+1) - c->car_data[car1].path_history->exit_time )* time_step* c->car_data[car1].velocity ;
+        dist4 = ((global_tick+1) - c->car_data[car2].path_history->exit_time )* time_step* c->car_data[car2].velocity ;
+
+    if(direction ==0)
+    {
+        if((dist1-dist2)*(dist3-dist4)<0)//collision detected
+            flag=1;
+    }
+   else
+   {
+      if((dist1+dist2) < e->distance && (dist3+dist4) >= e->distance) 
+          flag=1;
+   } 
+   if(flag==1)
+   {
+        temp = (COLLISION_DATA *)malloc(sizeof(COLLISION_DATA));
+        temp->car1_id = car1;
+            temp->car2_id = car2;
+            temp->edge_id = e->id;
+            temp->next=collisons;
+            temp->time = global_tick +1;
+            collisons = temp;
+   }
+}
+void handle_collison(EDGE *e,CARS *c,long global_tick)
+{
+    CARS_ON_EDGE *coe1,*coe2;
+    if(e->no_of_cars == 2)
+        detect_collison(e,c,e->car_list->car_id,e->car_list->car_id,global_tick);
+    else
+    {
+        coe1=e->car_list;
+        coe2=coe1->next;
+        while(coe1->next != NULL)
+        {
+            while(coe2!=NULL){
+                detect_collison(e,c,coe1->car_id,coe2->car_id,global_tick);
+                coe2=coe2->next;
+            }
+            coe1=coe1->next;
+        }
+    }
+}
+void update_car_destination(CAR *c,int next_node_id,int next_edge_id,long global_tick)
+{
+    c->current_destination = next_node_id ;
+    c->last_node_visited = c->path_history->path_node;
+    c->path_history->exit_time = global_tick;
+    c->current_edge = next_edge_id ;
+    c->path_history->exit_time =global_tick;
 }
 void start_simulation(GRAPH *g,CARS *c, EDGES *e )
 {
@@ -211,36 +356,49 @@ void start_simulation(GRAPH *g,CARS *c, EDGES *e )
     int i=0;
     int next_node_id,next_edge_id;
     int done = 0;
-    for(i=0;i<c->no_of_cars;i++)
-        c->car_data[i].last_node_visited =c->car_data[i].start_node; 
-      
-    while(done != 1){
-        done =1;
-        for(i=0;i<c->no_of_cars;++i)
-            update_car_path((c->car_data) + i);
-        for(i=0;i<c->no_of_cars;++i)
-            if(car_at_node((c->car_data)+i))
+    
+    //initial make decision
+     for(i=0;i<c->no_of_cars;++i)
+            if(c->car_data[i].current_destination == -1)   // car at node
             {
                 make_decision(g,e,(c->car_data)+i,&next_node_id,&next_edge_id);
                 if(!(next_node_id==-1 && next_edge_id==-1))
-                    update_car_destination(g,e,c->car_data+i,next_node_id,next_edge_id);
+                    update_car_destination(c->car_data+i,next_node_id,next_edge_id,global_tick);
             }
+    
+    //simulation loop 
+    while(done != 1)
+    {
+        done =1;
+        // collison handling
+        for(i=0;e->no_of_edges;++i)
+        {
+            if(e->edge_data[i].no_of_cars >=2)
+            handle_collison((e->edge_data)+i,c,global_tick);
+        }
+        
+        for(i=0;i<c->no_of_cars;++i)
+            update_car_path((c->car_data) + i,e,global_tick);
 
         for(i=0;i<c->no_of_cars;++i)
+            if(c->car_data[i].current_destination == -1)   // car at node
+            {
+                make_decision(g,e,(c->car_data)+i,&next_node_id,&next_edge_id);
+                if(!(next_node_id==-1 && next_edge_id==-1))
+                    update_car_destination(c->car_data+i,next_node_id,next_edge_id,global_tick);
+            }
+
+        for(i=0;i<c->no_of_cars;++i)//check for all car finished traversing 
         {
             if(c->car_data[i].done != 1)
                 done = 0;
-
         }
         ++global_tick;
     }
-
 }
-
 
 int main(int argc , char * argv[])
 {
-    
     if(argc !=4 ){
         printf("\nUSAGE : simuation file_name time_step");exit(0);}
     GRAPH G; 

@@ -10,7 +10,7 @@ typedef struct node{
 typedef struct path_info{
     long enter_time;    // time of entering a node      
     long exit_time;     // time of leaving a node
-    struct node * path_node;
+    int path_node;
     struct path_info * next;
 }PATH_INFO;
 
@@ -20,6 +20,12 @@ typedef struct age_info{
     long idle_finish_time; // finishing of an idle period
     struct age_info * next;// history of the last idle period
 } AGE_INFO;
+
+typedef struct cars_on_edge
+{
+    int car_id;
+    struct cars_on_edge * next;
+}CARS_ON_EDGE;
 
 // To hold the information of an edge 
 typedef struct edge {
@@ -31,6 +37,8 @@ typedef struct edge {
     int status;                     // busy or idle
     int no_of_cars;                 // no of cars currently traversing the edge
     int type;                       //type=1 means unidirectional edge and type=2 means bidirectional edge .
+    int last_car_exit_time;
+    CARS_ON_EDGE *car_list;
 }EDGE;
 
 // TO hold the information of a car 
@@ -46,6 +54,7 @@ typedef struct car
     int no_of_collisons;
     int start_node;
     int end_node;
+    int done;
     struct path_info * path_history;
 }CAR;
 
@@ -70,10 +79,20 @@ typedef struct cars
     int no_of_cars;
     CAR *car_data;
 }CARS;
+
 typedef struct edges
 {
     int no_of_edges;
     EDGE * edge_data;
 }EDGES;
-// function declarations
 
+typedef struct collision_data
+{
+    int car1_id;
+    int car2_id;
+    int edge_id;
+    long time ;
+    struct collision_data * next;
+}COLLISION_DATA;
+// function declarations
+void make_decision(GRAPH *g,EDGES *e,CAR *c,int *next_node_id,int *next_edge_id);
