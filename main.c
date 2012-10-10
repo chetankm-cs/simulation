@@ -2,6 +2,8 @@
 /***********************************************************
  * function to read the graph info from the file 
  * *********************************************************/
+
+float time_step;
 int insert(ADJACENCY_LIST **list, int vertex_id,int next_vertex,int weight)
 {
     ADJACENCY_LIST *temp;
@@ -87,6 +89,7 @@ int read_cars(CARS *C,char *filepath)
         fscanf(fp,"%d",&temp[i].start_node);
         fscanf(fp,"%d",&temp[i].end_node);
         fscanf(fp,"%d",&temp[i].endurance);
+        fscanf(fp,"%d",&temp[i].velocity);
         temp[i].id = i;
         temp[i].last_node_visited=-1;
         temp[i].current_destination=-1;
@@ -104,14 +107,22 @@ void print_cars(CARS *c)
     int i;
     for ( i=0;i<c->no_of_cars;++i)
     {
-        printf("\n%s start_node %d end_node %d endurance %d ",c->car_data[i].name,c->car_data[i].start_node,c->car_data[i].end_node,c->car_data[i].endurance);
+        printf("\n%s start_node %d end_node %d endurance %d  velocity %d ",c->car_data[i].name,c->car_data[i].start_node,c->car_data[i].end_node,c->car_data[i].endurance,c->car_data[i].velocity);
     }
+}void update_car_path_initial(CAR *c)
+{
+    c->last_node_visited =c->start_node;
+   
+}void update_car_path_initial(CAR *c)
+{
+    c->last_node_visited =c->start_node;
+   
 }
-int check_edge_id(ADJACENCY_LIST *p,int value,int vertex_id)
+int check_edge_id(ADJACENCY_LIST *p,int value,int vertex_id, int weight) // this function is to  allocate edge id if edge is bydirectional then same edge id goes to both places in adjacency list .if there are multipal bidirectional or unidirectional edges between two nodes then each edge gets different id and same values goes on both the places in adjacency list. 
 {
     while(p!=NULL)
     {
-        if(p->next_node == vertex_id && p->edge_id == -1)
+        if(p->next_node == vertex_id && p->edge_id == -1 && p->weight == weight)// for edge to be bidirectional its weight should be same on both places in adjacency list.
         {
             p->edge_id = value;
             break;
@@ -119,7 +130,7 @@ int check_edge_id(ADJACENCY_LIST *p,int value,int vertex_id)
         p=p->next;
     }
 }
-int allocate_edge_id(GRAPH *g)
+int allocate_edge_id(GRAPH *g)  
 {
     int i, count =0 ;
     ADJACENCY_LIST *temp;
@@ -128,10 +139,14 @@ int allocate_edge_id(GRAPH *g)
         temp=g->graph_data[i];
         while(temp != NULL)
         {
-            if(temp->edge_id == -1)
+      void update_car_path_initial(CAR *c)
+{
+    c->last_node_visited =c->start_node;
+   
+}      if(temp->edge_id == -1)
             {
                 temp->edge_id=count;
-                check_edge_id(g->graph_data[temp->next_node],count,i);
+                check_edge_id(g->graph_data[temp->next_node],count,i,temp->weight);
                 count++;
             }
             temp=temp->next;
@@ -185,18 +200,59 @@ void print_edges(EDGES *e)
         printf(" status:%d type:%d \n",e->edge_data[i].status , e->edge_data[i].type);
     }   
 }
+
+void update_car_path(CAR *c)
+{
+
+}
+void start_simulation(GRAPH *g,CARS *c, EDGES *e )
+{
+    long global_tick=0;
+    int i=0;
+    int next_node_id,next_edge_id;
+    int done = 0;
+    for(i=0;i<c->no_of_cars;i++)
+        c->car_data[i].last_node_visited =c->car_data[i].start_node; 
+      
+    while(done != 1){
+        done =1;
+        for(i=0;i<c->no_of_cars;++i)
+            update_car_path((c->car_data) + i);
+        for(i=0;i<c->no_of_cars;++i)
+            if(car_at_node((c->car_data)+i))
+            {
+                make_decision(g,e,(c->car_data)+i,&next_node_id,&next_edge_id);
+                if(!(next_node_id==-1 && next_edge_id==-1))
+                    update_car_destination(g,e,c->car_data+i,next_node_id,next_edge_id);
+            }
+
+        for(i=0;i<c->no_of_cars;++i)
+        {
+            if(c->car_data[i].done != 1)
+                done = 0;
+
+        }
+        ++global_tick;
+    }
+
+}
+
+
 int main(int argc , char * argv[])
 {
+    
     if(argc !=4 ){
         printf("\nUSAGE : simuation file_name time_step");exit(0);}
     GRAPH G; 
     CARS C;
     EDGES E;
+    time_step = atof(argv[3]);
     read_graph(&G, argv[1]); 
     read_cars(&C, argv[2]);
     print_graph(&G);
     print_cars(&C);
     init(&G,&C,&E);
-
     print_edges(&E);
+    printf(" \n time_step : %f",time_step);
+    start_simulation(&G,&C,&E);
 }

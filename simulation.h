@@ -30,7 +30,7 @@ typedef struct edge {
     long max_age;                   // maximum idle time
     int status;                     // busy or idle
     int no_of_cars;                 // no of cars currently traversing the edge
-    int type;
+    int type;                       //type=1 means unidirectional edge and type=2 means bidirectional edge .
 }EDGE;
 
 // TO hold the information of a car 
@@ -39,6 +39,7 @@ typedef struct car
     char name[10];
     int current_destination;    
     int last_node_visited;
+    int current_edge;
     int velocity;
     int endurance;
     int id;
