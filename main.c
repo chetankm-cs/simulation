@@ -395,12 +395,53 @@ void start_simulation(GRAPH *g,CARS *c, EDGES *e )
         }
         ++global_tick;
     }
+    printf("\nSimulation Time = %ld ticks \n",global_tick);
 }
-
+void print_collisons()
+{
+    printf("\n===============================\nCollisons\n==================================\n");
+    while(collisons != NULL)
+    {
+        printf("car1:%d car2:%d edge:%d time:%ld\n",collisons->car1_id,collisons->car2_id,collisons->edge_id,collisons->time);
+        collisons=collisons->next;
+    }
+}
+void print_edge_history(EDGES *e)
+{
+    int i;
+    AGE_INFO *temp;
+    printf("\n===============================\nEdge History\n==================================\n");
+    for(i=0;i<e->no_of_edges;++i)
+    {
+        printf("EDGE : %d\n",i);
+        temp= e->edge_data[i].age_history;
+        while(temp!=NULL)
+        {
+            printf("idle_start_time:%ld idle_finish_time:%ld\n",temp->idle_start_time,temp->idle_finish_time);
+            temp=temp->next;
+        }
+    }
+}
+void print_path_history(CARS *c)
+{
+    int i;
+    PATH_INFO *temp;
+    printf("\n===============================\nCar History\n==================================\n");
+    for(i=0;i<c->no_of_cars;++i)
+    {
+        printf("Car : %d\n",i);
+        temp=c->car_data[i].path_history;
+        while(temp!=NULL)
+        {
+            printf("path_node:%d enter_time:%ld exit_time=%ld\n",temp->path_node,temp->enter_time,temp->exit_time);
+            temp=temp->next;
+        }
+    }
+}
 int main(int argc , char * argv[])
 {
     if(argc !=4 ){
-        printf("\nUSAGE : simuation file_name time_step");exit(0);}
+        printf("\nUSAGE : simuation graph_data car_data time_step");exit(0);}
     GRAPH G; 
     CARS C;
     EDGES E;
@@ -411,6 +452,9 @@ int main(int argc , char * argv[])
     print_cars(&C);
     init(&G,&C,&E);
     print_edges(&E);
-    printf(" \n time_step : %f",time_step);
+    printf(" \n time_step : %f\n",time_step);
     start_simulation(&G,&C,&E);
+    print_collisons();
+    print_path_history(&C);
+    print_edge_history(&E);
 }
