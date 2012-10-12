@@ -49,10 +49,14 @@ void dfs_visit(GRAPH *g, stack *S, int v,int d, int *done,int edge_id)
     temp = g->graph_data[v];
 	while(temp != NULL)
 	{
-        if(temp->next_node == d) {*done=1;
+        if(temp->next_node == d) 
+        {
+            *done=1;
             push(&S,d,temp->edge_id);
-            return ;}
-		dfs_visit(g,S,temp->next_node,d,done,temp->edge_id);
+            return ;
+        }
+        if(is_instack(&S,temp->next_node,temp->edge_id)==0)
+     		dfs_visit(g,S,temp->next_node,d,done,temp->edge_id);
 	}
 	pop(&S);
 }
