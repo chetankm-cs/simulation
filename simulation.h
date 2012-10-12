@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
+#define DEBUG 1
 typedef struct node{
     int id;             // id of a vertex of grap
 }NODE;
